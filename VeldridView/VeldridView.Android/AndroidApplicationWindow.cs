@@ -5,7 +5,7 @@ using Veldrid;
 
 namespace VeldridView.Android
 {
-    public class AndroidApplicationWindow : ApplicationWindow
+    public class AndroidApplicationWindow : IApplicationWindow
     {
         // This is supposed to be a DisposeCollectorResourceFactory but it crashes mono
         private ResourceFactory _disposeFactory;
@@ -19,7 +19,6 @@ namespace VeldridView.Android
         public uint Width => (uint)_view.Width;
         public uint Height => (uint)_view.Height;
 
-        public SamplePlatformType PlatformType => SamplePlatformType.Mobile;
 
         public event Action<float> Rendering;
         public event Action Resized;

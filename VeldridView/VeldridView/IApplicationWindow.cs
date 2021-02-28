@@ -3,10 +3,8 @@ using Veldrid;
 
 namespace VeldridView
 {
-    public interface ApplicationWindow
+    public interface IApplicationWindow
     {
-        SamplePlatformType PlatformType { get; }
-
         event Action<float> Rendering;
         event Action<GraphicsDevice, ResourceFactory, Swapchain> GraphicsDeviceCreated;
         event Action GraphicsDeviceDestroyed;

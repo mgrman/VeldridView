@@ -15,40 +15,13 @@ namespace VeldridView
         private CommandList _cl;
         private  Pipeline _pipeline;
         private Random _rnd;
-        private Shader[] _shaders;
 
-        public ApplicationWindow Window { get; }
+        public IApplicationWindow Window { get; }
         public GraphicsDevice GraphicsDevice { get; private set; }
         public ResourceFactory ResourceFactory { get; private set; }
         public Swapchain MainSwapchain { get; private set; }
 
-        private const string VertexCode = @"
-#version 450
-
-layout(location = 0) in vec2 Position;
-layout(location = 1) in vec4 Color;
-
-layout(location = 0) out vec4 fsin_Color;
-
-void main()
-{
-    gl_Position = vec4(Position, 0, 1);
-    fsin_Color = Color;
-}";
-
-        private const string FragmentCode = @"
-#version 450
-
-layout(location = 0) in vec4 fsin_Color;
-layout(location = 0) out vec4 fsout_Color;
-
-void main()
-{
-    fsout_Color = fsin_Color;
-}";
-
-
-        public SampleApplication(ApplicationWindow window)
+        public SampleApplication(IApplicationWindow window)
         {
             Window = window;
             Window.Resized += HandleWindowResize;
@@ -80,54 +53,6 @@ void main()
 
         protected void CreateResources(ResourceFactory factory)
         {
-            VertexPositionColor[] quadVertices =
-            {
-                new VertexPositionColor(new Vector2(-0.75f, 0.75f), RgbaFloat.Red),
-                new VertexPositionColor(new Vector2(0.75f, 0.75f), RgbaFloat.Green),
-                new VertexPositionColor(new Vector2(-0.75f, -0.75f), RgbaFloat.Blue),
-                new VertexPositionColor(new Vector2(0.75f, -0.75f), RgbaFloat.Yellow)
-            };
-
-            ushort[] quadIndices = { 0, 1, 2, 3 };
-
-            VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
-                new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
-                new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4));
-
-            ShaderDescription vertexShaderDesc = new ShaderDescription(
-                ShaderStages.Vertex,
-                Encoding.UTF8.GetBytes(VertexCode),
-                "main");
-            ShaderDescription fragmentShaderDesc = new ShaderDescription(
-                ShaderStages.Fragment,
-                Encoding.UTF8.GetBytes(FragmentCode),
-                "main");
-
-            _shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
-
-            GraphicsPipelineDescription pipelineDescription = new GraphicsPipelineDescription();
-            pipelineDescription.BlendState = BlendStateDescription.SingleOverrideBlend;
-            pipelineDescription.DepthStencilState = new DepthStencilStateDescription(
-    depthTestEnabled: true,
-    depthWriteEnabled: true,
-    comparisonKind: ComparisonKind.LessEqual);
-            pipelineDescription.RasterizerState = new RasterizerStateDescription(
-    cullMode: FaceCullMode.Back,
-    fillMode: PolygonFillMode.Solid,
-    frontFace: FrontFace.Clockwise,
-    depthClipEnabled: true,
-    scissorTestEnabled: false);
-            pipelineDescription.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-            pipelineDescription.ResourceLayouts = System.Array.Empty<ResourceLayout>();
-
-            pipelineDescription.Outputs = MainSwapchain.Framebuffer.OutputDescription;
-
-            pipelineDescription.ShaderSet = new ShaderSetDescription(
-                vertexLayouts: new VertexLayoutDescription[] { vertexLayout },
-                shaders: _shaders);
-
-            _pipeline = factory.CreateGraphicsPipeline(pipelineDescription);
-
             _cl = factory.CreateCommandList();
             _rnd = new Random();
         }
@@ -144,7 +69,6 @@ void main()
             _cl.Begin();
             _cl.SetFramebuffer(MainSwapchain.Framebuffer);
             _cl.ClearColorTarget(0, new RgbaFloat((float)_rnd.NextDouble(), (float)_rnd.NextDouble(), (float)_rnd.NextDouble(), 1f));
-            //_cl.SetPipeline(_pipeline);
             _cl.End();
             GraphicsDevice.SubmitCommands(_cl);
             GraphicsDevice.WaitForIdle();

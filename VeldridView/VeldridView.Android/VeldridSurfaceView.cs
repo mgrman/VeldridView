@@ -168,5 +168,7 @@ namespace VeldridView.Android
         {
             _paused = false;
         }
+
+        
     }
 }
