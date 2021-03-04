@@ -4,8 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Veldrid;
-using Vortice.Direct3D11;
-using Vortice.DXGI;
 using Windows.Graphics.Display;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
@@ -16,7 +14,7 @@ namespace VeldridView.UWP
     public class VeldridPanel : SwapChainPanel, IApplicationWindow
     {
         private GraphicsDevice _gd;
-        private IDXGIFactory2 Factory;
+        //private IDXGIFactory2 Factory;
 
 
         // set to 1000 since during initialization of device in VeldridPanel_Loaded the size is not yet known.
@@ -60,10 +58,10 @@ namespace VeldridView.UWP
 
         void InitializeDevice()
         {
-            if (DXGI.CreateDXGIFactory1(out Factory).Failure)
-            {
-                throw new InvalidOperationException("Cannot create IDXGIFactory1");
-            }
+            //if (DXGI.CreateDXGIFactory1(out Factory).Failure)
+            //{
+            //    throw new InvalidOperationException("Cannot create IDXGIFactory1");
+            //}
 
             var ss = SwapchainSource.CreateUwp(this as SwapChainPanel, DisplayInformation.GetForCurrentView().LogicalDpi);
             var scd = new SwapchainDescription(
@@ -105,52 +103,52 @@ namespace VeldridView.UWP
         }
 
 
-        private IDXGIAdapter1 GetHardwareAdapter()
-        {
-            IDXGIAdapter1 adapter = null;
-            IDXGIFactory6 factory6 = Factory.QueryInterfaceOrNull<IDXGIFactory6>();
-            if (factory6 != null)
-            {
-                for (int adapterIndex = 0;
-                    factory6.EnumAdapterByGpuPreference(adapterIndex, GpuPreference.HighPerformance, out adapter) != Vortice.DXGI.ResultCode.NotFound;
-                    adapterIndex++)
-                {
-                    AdapterDescription1 desc = adapter.Description1;
+        //private IDXGIAdapter1 GetHardwareAdapter()
+        //{
+        //    IDXGIAdapter1 adapter = null;
+        //    IDXGIFactory6 factory6 = Factory.QueryInterfaceOrNull<IDXGIFactory6>();
+        //    if (factory6 != null)
+        //    {
+        //        for (int adapterIndex = 0;
+        //            factory6.EnumAdapterByGpuPreference(adapterIndex, GpuPreference.HighPerformance, out adapter) != Vortice.DXGI.ResultCode.NotFound;
+        //            adapterIndex++)
+        //        {
+        //            AdapterDescription1 desc = adapter.Description1;
 
-                    if ((desc.Flags & AdapterFlags.Software) != AdapterFlags.None)
-                    {
-                        // Don't select the Basic Render Driver adapter.
-                        adapter.Dispose();
-                        continue;
-                    }
+        //            if ((desc.Flags & AdapterFlags.Software) != AdapterFlags.None)
+        //            {
+        //                // Don't select the Basic Render Driver adapter.
+        //                adapter.Dispose();
+        //                continue;
+        //            }
 
-                    return adapter;
-                }
+        //            return adapter;
+        //        }
 
 
-                factory6.Dispose();
-            }
+        //        factory6.Dispose();
+        //    }
 
-            if (adapter == null)
-            {
-                for (int adapterIndex = 0;
-                    Factory.EnumAdapters1(adapterIndex, out adapter) != Vortice.DXGI.ResultCode.NotFound;
-                    adapterIndex++)
-                {
-                    AdapterDescription1 desc = adapter.Description1;
+        //    if (adapter == null)
+        //    {
+        //        for (int adapterIndex = 0;
+        //            Factory.EnumAdapters1(adapterIndex, out adapter) != Vortice.DXGI.ResultCode.NotFound;
+        //            adapterIndex++)
+        //        {
+        //            AdapterDescription1 desc = adapter.Description1;
 
-                    if ((desc.Flags & AdapterFlags.Software) != AdapterFlags.None)
-                    {
-                        // Don't select the Basic Render Driver adapter.
-                        adapter.Dispose();
-                        continue;
-                    }
+        //            if ((desc.Flags & AdapterFlags.Software) != AdapterFlags.None)
+        //            {
+        //                // Don't select the Basic Render Driver adapter.
+        //                adapter.Dispose();
+        //                continue;
+        //            }
 
-                    return adapter;
-                }
-            }
+        //            return adapter;
+        //        }
+        //    }
 
-            return adapter;
-        }
+        //    return adapter;
+        //}
     }
 }
