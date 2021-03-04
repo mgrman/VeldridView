@@ -22,7 +22,20 @@ namespace VeldridView.UWP
         public uint Height { get; private set; } = 1000;
 
         public event Action<float> Rendering;
-        public event Action<GraphicsDevice, ResourceFactory, Swapchain> GraphicsDeviceCreated;
+        private event Action<GraphicsDevice, ResourceFactory, Swapchain> graphicsDeviceCreated;
+        public event Action<GraphicsDevice, ResourceFactory, Swapchain> GraphicsDeviceCreated { add
+            {
+                graphicsDeviceCreated += value;
+                if (_gd != null)
+                {
+                    value.Invoke(_gd, _gd.ResourceFactory, _gd.MainSwapchain);
+                }
+            }
+            remove
+            {
+                graphicsDeviceCreated -= value;
+            }
+            }
         public event Action GraphicsDeviceDestroyed;
         public event Action Resized;
 
@@ -98,7 +111,7 @@ namespace VeldridView.UWP
                 throw new NotImplementedException();
             }
 
-            GraphicsDeviceCreated?.Invoke(_gd, _gd.ResourceFactory, _gd.MainSwapchain);
+            graphicsDeviceCreated?.Invoke(_gd, _gd.ResourceFactory, _gd.MainSwapchain);
 
         }
 

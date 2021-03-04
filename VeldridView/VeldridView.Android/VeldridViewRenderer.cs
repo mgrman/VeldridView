@@ -40,8 +40,8 @@ namespace VeldridView.Android
             var view = new VeldridSurfaceView(Context, backend, options);
             var window = new AndroidApplicationWindow(view);
             window.GraphicsDeviceCreated += (g, r, s) => window.Run();
-            var app = new SampleApplication(window);
 
+            e.NewElement.Window = window;
             SetNativeControl(view);
         }
 

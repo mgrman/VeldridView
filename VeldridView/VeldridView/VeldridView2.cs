@@ -5,9 +5,6 @@ namespace VeldridView
 {
     public class VeldridView2 : View
     {
-        public void Print()
-        {
-            Console.WriteLine("Hello Veldrid.Forms!");
-        }
+        public IApplicationWindow Window { get; set; }
     }
 }

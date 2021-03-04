@@ -20,9 +20,9 @@ namespace VeldridView.WPF
             }
 
             var view = new VeldridPanel();
-            var app = new SampleApplication(view);
             view.Run();
 
+            e.NewElement.Window = view;
             SetNativeControl(view);
         }
 
