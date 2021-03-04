@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using Veldrid;
+using Veldrid.SPIRV;
 
 namespace VeldridView
 {
@@ -14,6 +15,29 @@ namespace VeldridView
         private CommandList _cl;
         private  Pipeline _pipeline;
         private Random _rnd;
+        private DeviceBuffer _vertexBuffer;
+        private DeviceBuffer _indexBuffer;
+        private Shader[] _shaders;
+
+        private const string VertexCode = @"
+#version 450
+layout(location = 0) in vec2 Position;
+layout(location = 1) in vec4 Color;
+layout(location = 0) out vec4 fsin_Color;
+void main()
+{
+    gl_Position = vec4(Position, 0, 1);
+    fsin_Color = Color;
+}";
+
+        private const string FragmentCode = @"
+#version 450
+layout(location = 0) in vec4 fsin_Color;
+layout(location = 0) out vec4 fsout_Color;
+void main()
+{
+    fsout_Color = fsin_Color;
+}";
 
         public IApplicationWindow Window { get; }
         public GraphicsDevice GraphicsDevice { get; private set; }
@@ -54,6 +78,66 @@ namespace VeldridView
         {
             _cl = factory.CreateCommandList();
             _rnd = new Random();
+
+
+
+            VertexPositionColor[] quadVertices =
+            {
+                new VertexPositionColor(new Vector2(-.75f, .75f), RgbaFloat.Red),
+                new VertexPositionColor(new Vector2(.75f, .75f), RgbaFloat.Green),
+                new VertexPositionColor(new Vector2(-.75f, -.75f), RgbaFloat.Blue),
+                new VertexPositionColor(new Vector2(.75f, -.75f), RgbaFloat.Yellow)
+            };
+            BufferDescription vbDescription = new BufferDescription(
+                4 * VertexPositionColor.SizeInBytes,
+                BufferUsage.VertexBuffer);
+            _vertexBuffer = factory.CreateBuffer(vbDescription);
+            GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, quadVertices);
+
+            ushort[] quadIndices = { 0, 1, 2, 3 };
+            BufferDescription ibDescription = new BufferDescription(
+                4 * sizeof(ushort),
+                BufferUsage.IndexBuffer);
+            _indexBuffer = factory.CreateBuffer(ibDescription);
+            GraphicsDevice.UpdateBuffer(_indexBuffer, 0, quadIndices);
+
+            VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
+                new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
+                new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4));
+
+            ShaderDescription vertexShaderDesc = new ShaderDescription(
+                ShaderStages.Vertex,
+                Encoding.UTF8.GetBytes(VertexCode),
+                "main");
+            ShaderDescription fragmentShaderDesc = new ShaderDescription(
+                ShaderStages.Fragment,
+                Encoding.UTF8.GetBytes(FragmentCode),
+                "main");
+
+            _shaders = factory.CreateFromSpirv(vertexShaderDesc, fragmentShaderDesc);
+
+            // Create pipeline
+            GraphicsPipelineDescription pipelineDescription = new GraphicsPipelineDescription();
+            pipelineDescription.BlendState = BlendStateDescription.SingleOverrideBlend;
+            pipelineDescription.DepthStencilState = new DepthStencilStateDescription(
+                depthTestEnabled: true,
+                depthWriteEnabled: true,
+                comparisonKind: ComparisonKind.LessEqual);
+            pipelineDescription.RasterizerState = new RasterizerStateDescription(
+                cullMode: FaceCullMode.Back,
+                fillMode: PolygonFillMode.Solid,
+                frontFace: FrontFace.Clockwise,
+                depthClipEnabled: true,
+                scissorTestEnabled: false);
+            pipelineDescription.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+            pipelineDescription.ResourceLayouts = System.Array.Empty<ResourceLayout>();
+            pipelineDescription.ShaderSet = new ShaderSetDescription(
+                vertexLayouts: new VertexLayoutDescription[] { vertexLayout },
+                shaders: _shaders);
+            pipelineDescription.Outputs = MainSwapchain.Framebuffer.OutputDescription;
+
+            _pipeline = factory.CreateGraphicsPipeline(pipelineDescription);
+
         }
 
         protected virtual void CreateSwapchainResources(ResourceFactory factory) { }
@@ -65,14 +149,39 @@ namespace VeldridView
 
         protected void Draw(float deltaSeconds)
         {
+            // Begin() must be called before commands can be issued.
             _cl.Begin();
+
+            // We want to render directly to the output window.
             _cl.SetFramebuffer(MainSwapchain.Framebuffer);
             _cl.ClearColorTarget(0, new RgbaFloat((float)_rnd.NextDouble(), (float)_rnd.NextDouble(), (float)_rnd.NextDouble(), 1f));
+
+            // Set all relevant state to draw our quad.
+            _cl.SetVertexBuffer(0, _vertexBuffer);
+            _cl.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
+            _cl.SetPipeline(_pipeline);
+            // Issue a Draw command for a single instance with 4 indices.
+            _cl.DrawIndexed(
+                indexCount: 4,
+                instanceCount: 1,
+                indexStart: 0,
+                vertexOffset: 0,
+                instanceStart: 0);
+
+            // End() must be called before commands can be submitted for execution.
             _cl.End();
             GraphicsDevice.SubmitCommands(_cl);
-            GraphicsDevice.WaitForIdle();
+
+            // Once commands have been submitted, the rendered image can be presented to the application window.
             GraphicsDevice.SwapBuffers(MainSwapchain);
 
+            //_cl.Begin();
+            //_cl.SetFramebuffer(MainSwapchain.Framebuffer);
+            //_cl.ClearColorTarget(0, new RgbaFloat((float)_rnd.NextDouble(), (float)_rnd.NextDouble(), (float)_rnd.NextDouble(), 1f));
+            //_cl.End();
+            //GraphicsDevice.SubmitCommands(_cl);
+            ////GraphicsDevice.WaitForIdle();
+            //GraphicsDevice.SwapBuffers(MainSwapchain);
         }
 
         protected virtual void HandleWindowResize()
@@ -83,39 +192,6 @@ namespace VeldridView
 
         public Stream OpenEmbeddedAssetStream(string name) => GetType().Assembly.GetManifestResourceStream(name);
 
-        public Shader LoadShader(ResourceFactory factory, string set, ShaderStages stage, string entryPoint)
-        {
-            string name = $"{set}-{stage.ToString().ToLower()}.{GetExtension(factory.BackendType)}";
-            return factory.CreateShader(new ShaderDescription(stage, ReadEmbeddedAssetBytes(name), entryPoint));
-        }
-
-        public byte[] ReadEmbeddedAssetBytes(string name)
-        {
-            using (Stream stream = OpenEmbeddedAssetStream(name))
-            {
-                byte[] bytes = new byte[stream.Length];
-                using (MemoryStream ms = new MemoryStream(bytes))
-                {
-                    stream.CopyTo(ms);
-                    return bytes;
-                }
-            }
-        }
-
-        private static string GetExtension(GraphicsBackend backendType)
-        {
-			bool isMacOS = RuntimeInformation.OSDescription.Contains("Darwin");
-
-            return (backendType == GraphicsBackend.Direct3D11)
-                ? "hlsl.bytes"
-                : (backendType == GraphicsBackend.Vulkan)
-                    ? "450.glsl.spv"
-                    : (backendType == GraphicsBackend.Metal)
-					    ? isMacOS ? "metallib" : "ios.metallib"
-                        : (backendType == GraphicsBackend.OpenGL)
-                            ? "330.glsl"
-                            : "300.glsles";
-        }
 
         struct VertexPositionColor
         {

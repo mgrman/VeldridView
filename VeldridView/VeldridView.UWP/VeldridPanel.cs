@@ -87,8 +87,8 @@ namespace VeldridView.UWP
             var backend = GraphicsBackend.Direct3D11;
 
             var d3dOptions = new D3D11DeviceOptions() 
-            {                
-                AdapterPtr = GetHardwareAdapter().NativePointer // might not be necessary
+            {
+                //AdapterPtr = GetHardwareAdapter().NativePointer // can only be used with custom version of veldrid where the D3D11GraphicsDevice uses DriverType.Unknown
             };
 
             if (backend == GraphicsBackend.Direct3D11)
