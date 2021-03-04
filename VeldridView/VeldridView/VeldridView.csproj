@@ -16,8 +16,4 @@
     <PackageReference Include="Xamarin.Forms" Version="5.0.0.2012" />
     <PackageReference Include="Xamarin.Essentials" Version="1.6.1" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\..\MyX3DParser\src\MyX3DParser.Numerics\MyX3DParser.Numerics.csproj" />
-  </ItemGroup>
 </Project>

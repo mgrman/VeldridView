@@ -20,7 +20,6 @@
                 </FormattedString>
             </Label.FormattedText>
         </Label>
-        <Button Text="Click to load X3D" Clicked="Button_Clicked"/>
         <views:VeldridView2 x:Name="VeldridView"
                            VerticalOptions="FillAndExpand" />
     </StackLayout>

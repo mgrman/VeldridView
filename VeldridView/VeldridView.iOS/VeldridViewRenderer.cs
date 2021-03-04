@@ -24,8 +24,8 @@ namespace VeldridView.iOS
 
             var view = new UIViewApplicationWindow();
             view.GraphicsDeviceCreated += (g, r, s) => view.Run();
+            var app = new SampleApplication(view);
 
-            e.NewElement.Window = view;
             SetNativeControl(view);
         }
 

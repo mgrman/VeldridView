@@ -1,8 +1,6 @@
-﻿using MyX3DParser.Generated.Model.Statements;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -17,20 +15,18 @@ namespace VeldridView
         private CommandList _cl;
         private  Pipeline _pipeline;
         private Random _rnd;
-
         private DeviceBuffer _vertexBuffer;
         private DeviceBuffer _indexBuffer;
-        private uint _indexCount;
         private Shader[] _shaders;
 
         private const string VertexCode = @"
 #version 450
-layout(location = 0) in vec3 Position;
+layout(location = 0) in vec2 Position;
 layout(location = 1) in vec4 Color;
 layout(location = 0) out vec4 fsin_Color;
 void main()
 {
-    gl_Position = vec4(Position.x,Position.y,0, 1);
+    gl_Position = vec4(Position, 0, 1);
     fsin_Color = Color;
 }";
 
@@ -45,53 +41,6 @@ void main()
 
         public IApplicationWindow Window { get; }
         public GraphicsDevice GraphicsDevice { get; private set; }
-
-        internal void LoadX3d(X3D x3d)
-        {
-
-            var shapes = x3d.ParentContext.ShapeNodes;
-
-
-            var triCount = shapes.Sum(o => o.Mesh.Indices.Count * o.MyPositions.Count) / 3;
-            var quadVertices = new VertexPositionColor[triCount * 3];
-            var quadIndices = new ushort[triCount * 3];
-
-            int pointIndex = 0;
-            foreach (var item in shapes)
-            {
-                
-                var color = new RgbaFloat(item.Material.diffuseColor.R, item.Material.diffuseColor.G, item.Material.diffuseColor.B, item.Material.diffuseColor.A);
-                foreach (var position in item.MyPositions)
-                {
-                    foreach (var index in item.Mesh.Indices)
-                    {
-                        var vertex = item.Mesh.Vertices[index];
-
-                        quadIndices[pointIndex] = (ushort)index;
-                        quadVertices[pointIndex] = new VertexPositionColor(Vector3.Transform(vertex, position.Matrix)*2f, color);
-
-
-                        pointIndex++;
-                    }
-                }
-            }
-
-            BufferDescription vbDescription = new BufferDescription(
-                (uint)(quadVertices.Length * VertexPositionColor.SizeInBytes),
-                BufferUsage.VertexBuffer);
-            _vertexBuffer = ResourceFactory.CreateBuffer(vbDescription);
-            GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, quadVertices);
-
-            BufferDescription ibDescription = new BufferDescription(
-                (uint)(quadIndices.Length * sizeof(ushort)),
-                BufferUsage.IndexBuffer);
-            _indexBuffer = ResourceFactory.CreateBuffer(ibDescription);
-
-            _indexCount = (uint)quadIndices.Length;
-
-            GraphicsDevice.UpdateBuffer(_indexBuffer, 0, quadIndices);
-        }
-
         public ResourceFactory ResourceFactory { get; private set; }
         public Swapchain MainSwapchain { get; private set; }
 
@@ -131,8 +80,29 @@ void main()
             _rnd = new Random();
 
 
+
+            VertexPositionColor[] quadVertices =
+            {
+                new VertexPositionColor(new Vector2(-.75f, .75f), RgbaFloat.Red),
+                new VertexPositionColor(new Vector2(.75f, .75f), RgbaFloat.Green),
+                new VertexPositionColor(new Vector2(-.75f, -.75f), RgbaFloat.Blue),
+                new VertexPositionColor(new Vector2(.75f, -.75f), RgbaFloat.Yellow)
+            };
+            BufferDescription vbDescription = new BufferDescription(
+                4 * VertexPositionColor.SizeInBytes,
+                BufferUsage.VertexBuffer);
+            _vertexBuffer = factory.CreateBuffer(vbDescription);
+            GraphicsDevice.UpdateBuffer(_vertexBuffer, 0, quadVertices);
+
+            ushort[] quadIndices = { 0, 1, 2, 3 };
+            BufferDescription ibDescription = new BufferDescription(
+                4 * sizeof(ushort),
+                BufferUsage.IndexBuffer);
+            _indexBuffer = factory.CreateBuffer(ibDescription);
+            GraphicsDevice.UpdateBuffer(_indexBuffer, 0, quadIndices);
+
             VertexLayoutDescription vertexLayout = new VertexLayoutDescription(
-                new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float3),
+                new VertexElementDescription("Position", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float2),
                 new VertexElementDescription("Color", VertexElementSemantic.TextureCoordinate, VertexElementFormat.Float4));
 
             ShaderDescription vertexShaderDesc = new ShaderDescription(
@@ -154,12 +124,12 @@ void main()
                 depthWriteEnabled: true,
                 comparisonKind: ComparisonKind.LessEqual);
             pipelineDescription.RasterizerState = new RasterizerStateDescription(
-                cullMode: FaceCullMode.None,
+                cullMode: FaceCullMode.Back,
                 fillMode: PolygonFillMode.Solid,
-                frontFace: FrontFace.CounterClockwise,
+                frontFace: FrontFace.Clockwise,
                 depthClipEnabled: true,
                 scissorTestEnabled: false);
-            pipelineDescription.PrimitiveTopology = PrimitiveTopology.TriangleList;
+            pipelineDescription.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
             pipelineDescription.ResourceLayouts = System.Array.Empty<ResourceLayout>();
             pipelineDescription.ShaderSet = new ShaderSetDescription(
                 vertexLayouts: new VertexLayoutDescription[] { vertexLayout },
@@ -192,7 +162,7 @@ void main()
             _cl.SetPipeline(_pipeline);
             // Issue a Draw command for a single instance with 4 indices.
             _cl.DrawIndexed(
-                indexCount: _indexCount,
+                indexCount: 4,
                 instanceCount: 1,
                 indexStart: 0,
                 vertexOffset: 0,
@@ -225,14 +195,14 @@ void main()
 
         struct VertexPositionColor
         {
-            public Vector3 Position; // This is the position, in normalized device coordinates.
+            public Vector2 Position; // This is the position, in normalized device coordinates.
             public RgbaFloat Color; // This is the color of the vertex.
-            public VertexPositionColor(Vector3 position, RgbaFloat color)
+            public VertexPositionColor(Vector2 position, RgbaFloat color)
             {
                 Position = position;
                 Color = color;
             }
-            public const int SizeInBytes = sizeof(float) *7;
+            public const uint SizeInBytes = 24;
         }
     }
 }
