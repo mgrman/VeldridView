@@ -1,37 +1,123 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Reactive.Subjects;
 using System.Text;
 using System.Threading.Tasks;
 using Veldrid;
 using Windows.Graphics.Display;
+using Windows.UI.Core;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
+using Windows.UI.Xaml.Controls.Maps;
 using Windows.UI.Xaml.Media;
 
 namespace VeldridView.UWP
 {
-    public class VeldridPanel : SwapChainPanel, IApplicationWindow
+    public class VeldridPanel : UserControl, IApplicationWindow
     {
-        private GraphicsDevice _gd;
-        //private IDXGIFactory2 Factory;
+        private GraphicsDevice? _gd;
+        private readonly Stopwatch _sw;
+        private double _previousSeconds;
 
 
-        // set to 1000 since during initialization of device in VeldridPanel_Loaded the size is not yet known.
-        public uint Width { get; private set; } = 1000;
-        public uint Height { get; private set; } = 1000;
+        private readonly Subject<float> rendering = new();
+        private readonly BehaviorSubject<GraphicsDevice?> graphicsDevice = new(null);
+        private readonly BehaviorSubject<Swapchain?> swapchain = new(null);
+        private readonly BehaviorSubject<(uint width, uint height)> size;
 
-        public event Action<float> Rendering;
-        public event Action<GraphicsDevice, ResourceFactory, Swapchain> GraphicsDeviceCreated;
-        public event Action GraphicsDeviceDestroyed;
-        public event Action Resized;
+        private Subject<KeyEvent> keyChange = new Subject<KeyEvent>();
+        private Subject<PointerEvent> pointerChange = new Subject<PointerEvent>();
+        private SwapChainPanel swapchainPanel;
+
+        IObservable<float> IApplicationWindow.Rendering => rendering;
+        IObservable<GraphicsDevice?> IApplicationWindow.GraphicsDevice => graphicsDevice;
+        IObservable<Swapchain?> IApplicationWindow.Swapchain => swapchain;
+        IObservable<(uint width, uint height)> IApplicationWindow.Size => size;
+        IObservable<KeyEvent> IApplicationWindow.KeyChange => keyChange;
+        IObservable<PointerEvent> IApplicationWindow.PointerChange => pointerChange;
 
         public VeldridPanel()
         {
+            _sw = Stopwatch.StartNew();
+            size = new BehaviorSubject<(uint width, uint height)>((1000, 1000));
             this.Loaded += VeldridPanel_Loaded;
+
+
+            this.KeyDown += VeldridPanel_KeyDown;
+            this.KeyUp += VeldridPanel_KeyUp;
+            this.Tapped += VeldridPanel_Tapped;
+            this.Holding += VeldridPanel_Holding;
+            this.IsDoubleTapEnabled = true;
+            this.DoubleTapped += VeldridPanel_DoubleTapped;
+            this.ManipulationStarted += VeldridPanel_ManipulationStarted;
+            this.ManipulationDelta += VeldridPanel_ManipulationDelta;
+
+            this.ManipulationCompleted += VeldridPanel_ManipulationCompleted;
+
+            swapchainPanel = new SwapChainPanel();
+
+            this.Content = swapchainPanel;
+
+
+            this.IsTapEnabled = true;
+            this.AllowFocusOnInteraction = true;
+            this.ManipulationMode = Windows.UI.Xaml.Input.ManipulationModes.TranslateX | Windows.UI.Xaml.Input.ManipulationModes.TranslateY | Windows.UI.Xaml.Input.ManipulationModes.Scale;
+
+            this.PointerWheelChanged += VeldridPanel_PointerWheelChanged;
+
+            //CoreWindow.GetForCurrentThread().KeyDown += VeldridPanel_KeyDown; ;
+            //CoreWindow.GetForCurrentThread().KeyUp += VeldridPanel_KeyUp;
         }
 
-        private void VeldridPanel_Loaded(object sender, Windows.UI.Xaml.RoutedEventArgs e)
+        private void VeldridPanel_PointerWheelChanged(object sender, Windows.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            var absDelta = e.GetCurrentPoint(this).Properties.MouseWheelDelta;
+
+
+            pointerChange.OnNext(new PointerEvent(System.Numerics.Vector2.Zero, 1,absDelta / 10f));
+        }
+
+        private void VeldridPanel_ManipulationCompleted(object sender, Windows.UI.Xaml.Input.ManipulationCompletedRoutedEventArgs e)
+        {
+        }
+
+        private void VeldridPanel_ManipulationDelta(object sender, Windows.UI.Xaml.Input.ManipulationDeltaRoutedEventArgs e)
+        {
+            pointerChange.OnNext(new PointerEvent(new System.Numerics.Vector2((float)e.Delta.Translation.X, (float)e.Delta.Translation.Y), e.Delta.Scale,0));
+        }
+
+        private void VeldridPanel_ManipulationStarted(object sender, Windows.UI.Xaml.Input.ManipulationStartedRoutedEventArgs e)
+        {
+        }
+
+        private void VeldridPanel_DoubleTapped(object sender, Windows.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+        {
+
+        }
+
+        private void VeldridPanel_Holding(object sender, Windows.UI.Xaml.Input.HoldingRoutedEventArgs e)
+        {
+        }
+
+        private void VeldridPanel_Tapped(object sender, Windows.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            this.Focus(FocusState.Pointer);
+        }
+
+        private void VeldridPanel_KeyDown(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            keyChange.OnNext(new KeyEvent(e.Key.ToString(), true));
+        }
+
+        private void VeldridPanel_KeyUp(object sender, Windows.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            keyChange.OnNext(new KeyEvent(e.Key.ToString(), false));
+        }
+
+
+        private void VeldridPanel_Loaded(object sender, RoutedEventArgs e)
         {
             InitializeDevice();
         }
@@ -43,41 +129,37 @@ namespace VeldridView.UWP
 
         private void CompositionTarget_Rendering(object sender, object e)
         {
-            var newWidth = (uint)RenderSize.Width;
-            var newHeight = (uint)RenderSize.Height;
-            if (newWidth != Width || newHeight != Height)
+            if (_gd == null)
             {
-                Width = newWidth;
-                Height = newHeight;
-                _gd.MainSwapchain.Resize(Width, Height);
-                Resized?.Invoke();
+                return;
             }
 
-            Rendering?.Invoke(0.1f);
+            var newSize = (width:(uint)RenderSize.Width, height: (uint)RenderSize.Height);
+            if (newSize != size.Value)
+            {
+                _gd.MainSwapchain.Resize(newSize.width, newSize.height);
+                size.OnNext(newSize);
+            }
+
+            double newSeconds = _sw.Elapsed.TotalSeconds;
+            double deltaSeconds = newSeconds - _previousSeconds;
+            _previousSeconds = newSeconds;
+            rendering.OnNext((float)deltaSeconds);
         }
 
         void InitializeDevice()
         {
-            //if (DXGI.CreateDXGIFactory1(out Factory).Failure)
-            //{
-            //    throw new InvalidOperationException("Cannot create IDXGIFactory1");
-            //}
-
-            var ss = SwapchainSource.CreateUwp(this as SwapChainPanel, DisplayInformation.GetForCurrentView().LogicalDpi);
+            var ss = SwapchainSource.CreateUwp(swapchainPanel, DisplayInformation.GetForCurrentView().LogicalDpi);
             var scd = new SwapchainDescription(
                 ss,
-                Width,
-                Height,
+                size.Value.width,
+                size.Value.height,
                 PixelFormat.R32_Float,
                 false);
 
-            var debug = false;
-#if DEBUG
-            debug = true;
-#endif
             var options = new GraphicsDeviceOptions(
               debug: false,
-              swapchainDepthFormat: PixelFormat.R16_UNorm,
+              swapchainDepthFormat: PixelFormat.R32_Float,
               syncToVerticalBlank: true,
               resourceBindingModel: ResourceBindingModel.Improved,
               preferDepthRangeZeroToOne: true,
@@ -86,7 +168,7 @@ namespace VeldridView.UWP
 
             var d3dOptions = new D3D11DeviceOptions() 
             {
-                //AdapterPtr = GetHardwareAdapter().NativePointer // can only be used with custom version of veldrid where the D3D11GraphicsDevice uses DriverType.Unknown
+                DeviceCreationFlags= (uint) Vortice.Direct3D11.DeviceCreationFlags.Debug
             };
 
             if (backend == GraphicsBackend.Direct3D11)
@@ -97,58 +179,9 @@ namespace VeldridView.UWP
             {
                 throw new NotImplementedException();
             }
-
-            GraphicsDeviceCreated?.Invoke(_gd, _gd.ResourceFactory, _gd.MainSwapchain);
+            graphicsDevice.OnNext(_gd);
+            swapchain.OnNext(_gd.MainSwapchain);
 
         }
-
-
-        //private IDXGIAdapter1 GetHardwareAdapter()
-        //{
-        //    IDXGIAdapter1 adapter = null;
-        //    IDXGIFactory6 factory6 = Factory.QueryInterfaceOrNull<IDXGIFactory6>();
-        //    if (factory6 != null)
-        //    {
-        //        for (int adapterIndex = 0;
-        //            factory6.EnumAdapterByGpuPreference(adapterIndex, GpuPreference.HighPerformance, out adapter) != Vortice.DXGI.ResultCode.NotFound;
-        //            adapterIndex++)
-        //        {
-        //            AdapterDescription1 desc = adapter.Description1;
-
-        //            if ((desc.Flags & AdapterFlags.Software) != AdapterFlags.None)
-        //            {
-        //                // Don't select the Basic Render Driver adapter.
-        //                adapter.Dispose();
-        //                continue;
-        //            }
-
-        //            return adapter;
-        //        }
-
-
-        //        factory6.Dispose();
-        //    }
-
-        //    if (adapter == null)
-        //    {
-        //        for (int adapterIndex = 0;
-        //            Factory.EnumAdapters1(adapterIndex, out adapter) != Vortice.DXGI.ResultCode.NotFound;
-        //            adapterIndex++)
-        //        {
-        //            AdapterDescription1 desc = adapter.Description1;
-
-        //            if ((desc.Flags & AdapterFlags.Software) != AdapterFlags.None)
-        //            {
-        //                // Don't select the Basic Render Driver adapter.
-        //                adapter.Dispose();
-        //                continue;
-        //            }
-
-        //            return adapter;
-        //        }
-        //    }
-
-        //    return adapter;
-        //}
     }
 }

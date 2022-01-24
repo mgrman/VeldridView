@@ -23,6 +23,8 @@
     <AndroidHttpClientHandlerType>Xamarin.Android.Net.AndroidClientHandler</AndroidHttpClientHandlerType>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
+    <Nullable>enable</Nullable>
+    <LangVersion>preview</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -55,22 +57,21 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Veldrid">
-      <Version>4.8.0</Version>
+      <Version>4.9.0-gffcf1cdb33</Version>
     </PackageReference>
     <PackageReference Include="Veldrid.OpenGLBindings">
-      <Version>4.8.0</Version>
+      <Version>4.9.0-gffcf1cdb33</Version>
     </PackageReference>
     <PackageReference Include="Veldrid.SDL2">
-      <Version>4.8.0</Version>
+      <Version>4.9.0-gffcf1cdb33</Version>
     </PackageReference>
     <PackageReference Include="Veldrid.SPIRV">
       <Version>1.0.14</Version>
     </PackageReference>
-    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2012" />
-    <PackageReference Include="Xamarin.Essentials" Version="1.6.1" />
+    <PackageReference Include="Xamarin.Forms" Version="5.0.0.2291" />
+    <PackageReference Include="Xamarin.Essentials" Version="1.7.0" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="AndroidApplicationWindow.cs" />
     <Compile Include="MainActivity.cs" />
     <Compile Include="Resources\Resource.designer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -1,18 +1,17 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Veldrid;
 
 namespace VeldridView
 {
     public interface IApplicationWindow
     {
-        event Action<float> Rendering;
-        event Action<GraphicsDevice, ResourceFactory, Swapchain> GraphicsDeviceCreated;
-        event Action GraphicsDeviceDestroyed;
-        event Action Resized;
+        IObservable<float> Rendering { get; }
+        IObservable<GraphicsDevice?> GraphicsDevice { get; }
+        IObservable<Swapchain?> Swapchain { get; }
+        IObservable<(uint width,uint height)> Size { get; }
 
-        uint Width { get; }
-        uint Height { get; }
-
-        void Run();
+        IObservable<KeyEvent> KeyChange { get; }
+        IObservable<PointerEvent> PointerChange { get; }
     }
 }

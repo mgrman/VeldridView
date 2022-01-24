@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Reactive.Subjects;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -19,53 +21,66 @@ namespace VeldridView.WPF
     {
         private GraphicsDevice _gd;
         private Swapchain _sc;
-        private event Action _resized;
+        private readonly Stopwatch _sw;
+        private double _previousSeconds;
 
-        // set to 1000 since during initialization of device in VeldridPanel_Loaded the size is not yet known.
-        public uint Width { get; private set; } = 1000;
-        public uint Height { get; private set; } = 1000;
 
-        public event Action<float> Rendering;
-        public event Action<GraphicsDevice, ResourceFactory, Swapchain> GraphicsDeviceCreated;
-        public event Action GraphicsDeviceDestroyed;
-        event Action IApplicationWindow.Resized { add { _resized += value; }remove { _resized -= value; } }
 
-        public bool IsRendering { get; private set; }
+        private readonly Subject<float> rendering = new();
+        private readonly BehaviorSubject<GraphicsDevice?> graphicsDevice = new(null);
+        private readonly BehaviorSubject<Swapchain?> swapchain = new(null);
+        private readonly BehaviorSubject<(uint width, uint height)> size;
+
+        private Subject<KeyEvent> keyChange = new Subject<KeyEvent>();
+        private Subject<PointerEvent> pointerChange = new Subject<PointerEvent>();
+
+        IObservable<float> IApplicationWindow.Rendering => rendering;
+        IObservable<GraphicsDevice?> IApplicationWindow.GraphicsDevice => graphicsDevice;
+        IObservable<Swapchain?> IApplicationWindow.Swapchain => swapchain;
+        IObservable<(uint width, uint height)> IApplicationWindow.Size => size;
+        IObservable<KeyEvent> IApplicationWindow.KeyChange => keyChange;
+        IObservable<PointerEvent> IApplicationWindow.PointerChange => pointerChange;
 
 
         public VeldridPanel()
         {
+            _sw = Stopwatch.StartNew();
+            size = new BehaviorSubject<(uint width, uint height)>((1000, 1000));
         }
 
         protected override sealed void Initialize()
         {
             CreateSwapchain();
 
-            IsRendering = true;
             CompositionTarget.Rendering += OnCompositionTargetRendering;
         }
 
         protected override sealed void Uninitialize()
         {
-            IsRendering = false;
             CompositionTarget.Rendering -= OnCompositionTargetRendering;
 
             DestroySwapchain();
         }
 
-        protected sealed override void Resized()
-        {
-            ResizeSwapchain();
-        }
-
-
 
         private void OnCompositionTargetRendering(object sender, EventArgs eventArgs)
         {
-            if (!IsRendering)
+            if (_gd == null)
+            {
                 return;
+            }
 
-            Rendering?.Invoke(0.1f);
+            var newSize = GetSize();
+            if (newSize != size.Value)
+            {
+                _gd.MainSwapchain.Resize(newSize.width, newSize.height);
+                size.OnNext(newSize);
+            }
+
+            double newSeconds = _sw.Elapsed.TotalSeconds;
+            double deltaSeconds = newSeconds - _previousSeconds;
+            _previousSeconds = newSeconds;
+            rendering.OnNext((float)deltaSeconds);
         }
 
         private double GetDpiScale()
@@ -78,15 +93,11 @@ namespace VeldridView.WPF
 
         protected virtual void CreateSwapchain()
         {
-            double dpiScale = GetDpiScale();
-            uint width = (uint)(ActualWidth < 0 ? 0 : Math.Ceiling(ActualWidth * dpiScale));
-            uint height = (uint)(ActualHeight < 0 ? 0 : Math.Ceiling(ActualHeight * dpiScale));
-
             Module mainModule = typeof(VeldridPanel).Module;
             IntPtr hinstance = Marshal.GetHINSTANCE(mainModule);
 
             SwapchainSource win32Source = SwapchainSource.CreateWin32(Hwnd, hinstance);
-            SwapchainDescription scDesc = new SwapchainDescription(win32Source, 100,100, PixelFormat.R32_Float, true);
+            SwapchainDescription scDesc = new SwapchainDescription(win32Source, size.Value.width, size.Value.height, PixelFormat.R32_Float, true);
 
             var options = new GraphicsDeviceOptions(
               debug: false,
@@ -105,7 +116,8 @@ namespace VeldridView.WPF
 
             _sc = _gd.ResourceFactory.CreateSwapchain(scDesc);
 
-            GraphicsDeviceCreated?.Invoke(_gd, _gd.ResourceFactory, _sc);
+            graphicsDevice.OnNext(_gd);
+            swapchain.OnNext(_sc);
         }
 
         protected virtual void DestroySwapchain()
@@ -113,20 +125,22 @@ namespace VeldridView.WPF
             _sc.Dispose();
         }
 
-        private void ResizeSwapchain()
+        private (uint width, uint height) GetSize()
         {
             double dpiScale = GetDpiScale();
             uint width = (uint)(ActualWidth < 0 ? 0 : Math.Ceiling(ActualWidth * dpiScale));
             uint height = (uint)(ActualHeight < 0 ? 0 : Math.Ceiling(ActualHeight * dpiScale));
             width = Math.Max(width, 1);
             height = Math.Max(width, 1);
-            _sc.Resize(width, height);
-
-            _resized?.Invoke();
+            return (width, height);
         }
 
 
         public void Run()
+        {
+        }
+
+        protected override void Resized()
         {
         }
     }

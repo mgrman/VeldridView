@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Numerics;
+using System.Reactive.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Veldrid;
@@ -11,13 +13,12 @@ namespace VeldridView
 {
     public  class SampleApplication
     {
-        protected Camera _camera;
-        private CommandList _cl;
-        private  Pipeline _pipeline;
+        private CommandList? _cl;
+        private  Pipeline? _pipeline;
         private Random _rnd;
-        private DeviceBuffer _vertexBuffer;
-        private DeviceBuffer _indexBuffer;
-        private Shader[] _shaders;
+        private DeviceBuffer? _vertexBuffer;
+        private DeviceBuffer? _indexBuffer;
+        private Shader[]? _shaders;
 
         private const string VertexCode = @"
 #version 450
@@ -40,46 +41,50 @@ void main()
 }";
 
         public IApplicationWindow Window { get; }
-        public GraphicsDevice GraphicsDevice { get; private set; }
-        public ResourceFactory ResourceFactory { get; private set; }
-        public Swapchain MainSwapchain { get; private set; }
+        public GraphicsDevice? GraphicsDevice { get; private set; }
+        public ResourceFactory? ResourceFactory { get; private set; }
+        public Swapchain? MainSwapchain { get; private set; }
 
         public SampleApplication(IApplicationWindow window)
         {
             Window = window;
-            Window.Resized += HandleWindowResize;
-            Window.GraphicsDeviceCreated += OnGraphicsDeviceCreated;
-            Window.GraphicsDeviceDestroyed += OnDeviceDestroyed;
-            Window.Rendering += PreDraw;
-            Window.Rendering += Draw;
 
-            _camera = new Camera(Window.Width, Window.Height);
+            Window.GraphicsDevice.CombineLatest(Window.Swapchain, (gd, sc) => (gd, sc))
+                .Subscribe(o => OnGraphicsDeviceChanged(o.gd, o.sc));
+
+            window.Rendering.Subscribe(Draw);
+            _rnd = new Random();
         }
 
-        public void OnGraphicsDeviceCreated(GraphicsDevice gd, ResourceFactory factory, Swapchain sc)
+        public void OnGraphicsDeviceChanged(GraphicsDevice? gd, Swapchain? sc)
         {
-            GraphicsDevice = gd;
-            ResourceFactory = factory;
-            MainSwapchain = sc;
-            CreateResources(factory);
-            CreateSwapchainResources(factory);
-        }
-
-        protected virtual void OnDeviceDestroyed()
-        {
-            GraphicsDevice = null;
-            ResourceFactory = null;
-            MainSwapchain = null;
+            if (gd != null && sc != null)
+            {
+                GraphicsDevice = gd;
+                ResourceFactory = gd.ResourceFactory;
+                MainSwapchain = sc;
+                CreateResources(ResourceFactory);
+                CreateSwapchainResources(ResourceFactory);
+            }
+            else
+            {
+                GraphicsDevice = null;
+                ResourceFactory = null;
+                MainSwapchain = null;
+            }
         }
 
         protected virtual string GetTitle() => GetType().Name;
 
         protected void CreateResources(ResourceFactory factory)
         {
+            if ( GraphicsDevice == null || MainSwapchain ==null)
+            {
+                Debug.WriteLine("CreateResources was called with null GraphicsDevice or null MainSwapchain");
+                return;
+            }
+
             _cl = factory.CreateCommandList();
-            _rnd = new Random();
-
-
 
             VertexPositionColor[] quadVertices =
             {
@@ -142,13 +147,14 @@ void main()
 
         protected virtual void CreateSwapchainResources(ResourceFactory factory) { }
 
-        private void PreDraw(float deltaSeconds)
-        {
-            _camera.Update(deltaSeconds);
-        }
-
         protected void Draw(float deltaSeconds)
         {
+            if (_cl == null || MainSwapchain == null || GraphicsDevice == null)
+            {
+                Debug.WriteLine("Trying to draw with null device");
+                return;
+            }
+
             // Begin() must be called before commands can be issued.
             _cl.Begin();
 
@@ -174,19 +180,6 @@ void main()
 
             // Once commands have been submitted, the rendered image can be presented to the application window.
             GraphicsDevice.SwapBuffers(MainSwapchain);
-
-            //_cl.Begin();
-            //_cl.SetFramebuffer(MainSwapchain.Framebuffer);
-            //_cl.ClearColorTarget(0, new RgbaFloat((float)_rnd.NextDouble(), (float)_rnd.NextDouble(), (float)_rnd.NextDouble(), 1f));
-            //_cl.End();
-            //GraphicsDevice.SubmitCommands(_cl);
-            ////GraphicsDevice.WaitForIdle();
-            //GraphicsDevice.SwapBuffers(MainSwapchain);
-        }
-
-        protected virtual void HandleWindowResize()
-        {
-            _camera.WindowResized(Window.Width, Window.Height);
         }
 
 

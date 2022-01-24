@@ -4,13 +4,13 @@ using VeldridView.WPF;
 using Xamarin.Forms;
 using Xamarin.Forms.Platform.WPF;
 
-[assembly: ExportRenderer(typeof(VeldridView2), typeof(VeldridViewRenderer))]
+[assembly: ExportRenderer(typeof(VeldridView.VeldridViewPanel), typeof(VeldridViewRenderer))]
 namespace VeldridView.WPF
 {
-    public class VeldridViewRenderer : ViewRenderer<VeldridView2, VeldridPanel>
+    public class VeldridViewRenderer : ViewRenderer<VeldridViewPanel, VeldridPanel>
     {
 
-        protected override void OnElementChanged(ElementChangedEventArgs<VeldridView2> e)
+        protected override void OnElementChanged(ElementChangedEventArgs<VeldridViewPanel> e)
         {
             base.OnElementChanged(e);
 
@@ -20,9 +20,9 @@ namespace VeldridView.WPF
             }
 
             var view = new VeldridPanel();
-            var app = new SampleApplication(view);
             view.Run();
 
+            e.NewElement.Window.OnNext(view);
             SetNativeControl(view);
         }
 

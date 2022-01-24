@@ -5,16 +5,16 @@ using VeldridView.Android;
 using Xamarin.Forms;
 using Xamarin.Forms.Platform.Android;
 
-[assembly: ExportRenderer(typeof(VeldridView2), typeof(VeldridViewRenderer))]
+[assembly: ExportRenderer(typeof(VeldridView.VeldridViewPanel), typeof(VeldridViewRenderer))]
 namespace VeldridView.Android
 {
-    public class VeldridViewRenderer : ViewRenderer<VeldridView2, VeldridSurfaceView>
+    public class VeldridViewRenderer : ViewRenderer<VeldridViewPanel, VeldridSurfaceView>
     {
         public VeldridViewRenderer(Context context) : base(context)
         {
         }
 
-        protected override void OnElementChanged(ElementChangedEventArgs<VeldridView2> e)
+        protected override void OnElementChanged(ElementChangedEventArgs<VeldridViewPanel> e)
         {
             base.OnElementChanged(e);
 
@@ -37,12 +37,10 @@ namespace VeldridView.Android
             GraphicsBackend backend = GraphicsDevice.IsBackendSupported(GraphicsBackend.Vulkan)
                 ? GraphicsBackend.Vulkan
                 : GraphicsBackend.OpenGLES;
-            var view = new VeldridSurfaceView(Context, backend, options);
-            var window = new AndroidApplicationWindow(view);
-            window.GraphicsDeviceCreated += (g, r, s) => window.Run();
-            var app = new SampleApplication(window);
+            var window = new VeldridSurfaceView(Context!, backend, options);
 
-            SetNativeControl(view);
+            e.NewElement.Window.OnNext(window);
+            SetNativeControl(window);
         }
 
         protected override void Dispose(bool disposing)

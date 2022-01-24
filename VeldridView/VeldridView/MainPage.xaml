@@ -20,8 +20,8 @@
                 </FormattedString>
             </Label.FormattedText>
         </Label>
-        <views:VeldridView2 x:Name="VeldridView"
-                           VerticalOptions="FillAndExpand" />
+        <views:VeldridViewPanel x:Name="VeldridView"
+                           VerticalOptions="FillAndExpand"  />
     </StackLayout>
 
 </ContentPage>
